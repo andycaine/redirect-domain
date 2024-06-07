@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: A site that redirects to another domain.
+
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: redirect-domain
+    Description: A site that redirects to another domain.
+    Author: Andy Caine
+    SemanticVersion: 0.1.0
+    SpdxLicenseId: MIT
+    LicenseUrl: LICENSE
+    ReadmeUrl: README.md
+    Labels: ['cloudformation', 'redirect']
+    HomePageUrl: https://github.com/andycaine/redirect-domain#readme
+    SourceCodeUrl: https://github.com/andycaine/redirect-domain
+Parameters:
+  DomainName:
+    Type: String
+    Description: The domain name.
+  TargetDomainName:
+    Type: String
+    Description: The domain to redirect to
+  HostedZoneId:
+    Type: String
+    Description: HostedZoneId for the Domain
+    Default: ""
+  CertificateArn:
+    Type: String
+    Description: CertificateArn for the Domain
+    Default: ""
+
+Conditions:
+  NoCertificateArn: !Equals [!Ref CertificateArn, ""]
+  HasHostedZoneId: !Not [!Equals [!Ref HostedZoneId, ""]]
+
+Resources:
+
+  RedirectCloudFrontFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub ${AWS::StackName}-rdrtd
+      AutoPublish: true
+      FunctionCode: !Sub |
+        function handler(event) {
+          return {
+            statusCode: 301,
+            statusDescription: 'Moved Permanently',
+            headers: {
+              location: {
+                value: "https://${TargetDomainName}"
+              }
+            }
+          }
+        }
+      FunctionConfig:
+        Comment: "Redirect to the target domain name"
+        Runtime: cloudfront-js-1.0
+
+  Certificate:
+    Type: "AWS::CertificateManager::Certificate"
+    Condition: NoCertificateArn
+    Properties:
+      CertificateTransparencyLoggingPreference: ENABLED
+      DomainName: !Ref DomainName
+      DomainValidationOptions: !If
+        - HasHostedZoneId
+        - - DomainName: !Ref DomainName
+            HostedZoneId: !Ref HostedZoneId
+        - !Ref AWS::NoValue
+      ValidationMethod: DNS
+
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+    DeletionPolicy: Delete
+
+  CloudFrontDistro:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - Id: DummyOrigin
+            DomainName: !GetAtt Bucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        Enabled: true
+        HttpVersion: http2and3
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - HEAD
+            - GET
+            - OPTIONS
+          TargetOriginId: DummyOrigin
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # caching optimised
+          Compress: true
+          ViewerProtocolPolicy: redirect-to-https
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt RedirectCloudFrontFunction.FunctionARN
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          AcmCertificateArn: !If
+            - NoCertificateArn
+            - !Ref Certificate
+            - !Ref CertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+        Aliases:
+          - !Ref DomainName
+
+  WebRecordSetGroup:
+    Type: "AWS::Route53::RecordSetGroup"
+    Condition: HasHostedZoneId
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      RecordSets:
+        - AliasTarget:
+            DNSName: !GetAtt CloudFrontDistro.DomainName
+            EvaluateTargetHealth: false
+            HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID
+          Name: !Ref DomainName
+          Type: A
+        - AliasTarget:
+            DNSName: !GetAtt CloudFrontDistro.DomainName
+            EvaluateTargetHealth: false
+            HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID
+          Name: !Ref DomainName
+          Type: AAAA
