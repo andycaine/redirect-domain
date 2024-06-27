@@ -43,12 +43,29 @@ Resources:
       AutoPublish: true
       FunctionCode: !Sub |
         function handler(event) {
+          var request = event.request;
+          var uri = request.uri;
+          var querystring = '';
+
+          // Construct querystring if it exists
+          if (request.querystring) {
+              var queryArray = [];
+              for (var key in request.querystring) {
+                  if (request.querystring.hasOwnProperty(key)) {
+                      queryArray.push(key + '=' + request.querystring[key].value);
+                  }
+              }
+              if (queryArray.length > 0) {
+                  querystring = '?' + queryArray.join('&');
+              }
+          }
+
           return {
             statusCode: 301,
             statusDescription: 'Moved Permanently',
             headers: {
               location: {
-                value: "https://${TargetDomainName}"
+                value: "https://${TargetDomainName}" + uri + querystring
               }
             }
           }
