@@ -7,3 +7,6 @@ publish: template.yaml
 
 tag:
 	git tag -a v$(VERSION) -m "Release $(VERSION)"
+
+release: tag
+	git push origin v$(VERSION)
