@@ -1,19 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Transform: AWS::Serverless-2016-10-31
 Description: A site that redirects to another domain.
 
-Metadata:
-  AWS::ServerlessRepo::Application:
-    Name: redirect-domain
-    Description: A site that redirects to another domain.
-    Author: Andy Caine
-    SemanticVersion: 0.1.0
-    SpdxLicenseId: MIT
-    LicenseUrl: LICENSE
-    ReadmeUrl: README.md
-    Labels: ['cloudformation', 'redirect']
-    HomePageUrl: https://github.com/andycaine/redirect-domain#readme
-    SourceCodeUrl: https://github.com/andycaine/redirect-domain
 Parameters:
   DomainName:
     Type: String
@@ -94,12 +81,32 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
     DeletionPolicy: Delete
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref Bucket
+      PolicyDocument:
+        Statement:
+          # Enforce SSL for all access
+          - Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !Sub arn:aws:s3:::${Bucket}
+              - !Sub arn:aws:s3:::${Bucket}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: false
 
   CloudFrontDistro:
     Type: AWS::CloudFront::Distribution

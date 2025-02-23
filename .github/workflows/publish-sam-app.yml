@@ -1,8 +1,9 @@
-name: Publish SAM App
+name: Publish template
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*.*.*'
 
 permissions:
   id-token: write  # required for requesting the JWT
@@ -14,22 +15,19 @@ jobs:
     steps:
     - name: Git clone
       uses: actions/checkout@v4
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v3
-      with:
-        python-version: "3.12"
     - name: AWS login
       uses: aws-actions/configure-aws-credentials@v3
       with:
-        role-to-assume: arn:aws:iam::211125310871:role/github-sar-publisher
-        role-session-name: github-sar-publishing
+        role-to-assume: arn:aws:iam::381491901281:role/cfn-assets-publisher-CfnAssetsPublisherRole-XcJfoWGHAY9o
+        role-session-name: github-publishing
         aws-region: eu-west-2
-    - name: Build app
-      run: |
-        sam build
-    - name: Package app
-      run: |
-        sam package --s3-bucket aws-sam-cli-managed-default-samclisourcebucket-64zranuhuogu --output-template-file packaged.yaml
     - name: Publish app
       run: |
-        sam publish --template packaged.yaml
+        make publish
+    - name: Create github release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref }}
+        name: ${{ github.ref }}
+        files: |
+          template.yaml
