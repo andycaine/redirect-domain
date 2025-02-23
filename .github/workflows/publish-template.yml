@@ -27,7 +27,5 @@ jobs:
     - name: Create github release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.ref }}
-        name: ${{ github.ref }}
         files: |
           template.yaml
