@@ -119,6 +119,7 @@ Resources:
               OriginAccessIdentity: ""
         Enabled: true
         HttpVersion: http2and3
+        DefaultRootObject: index.html
         DefaultCacheBehavior:
           AllowedMethods:
             - HEAD

@@ -1,6 +1,6 @@
 STACK_NAME := redirect-domain
 ASSETS_BUCKET := cfn-assets-repository-publicassetsbucket-lyi1yv8zzwxh
-VERSION := 1.0.2
+VERSION := 1.0.3
 
 publish: template.yaml
 	aws s3 cp $< s3://$(ASSETS_BUCKET)/$(STACK_NAME)-$(VERSION).yaml
